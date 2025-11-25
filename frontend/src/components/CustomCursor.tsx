@@ -1,16 +1,19 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import gsap from "gsap";
 
 const CustomCursor = () => {
-  const cursorRef = useRef(null);   // The small dot
-  const followerRef = useRef(null); // The big circle
-  const textRef = useRef(null);     // Text inside the cursor
+  const cursorRef = useRef<HTMLDivElement>(null);   // The small dot
+  const followerRef = useRef<HTMLDivElement>(null); // The big circle
+  const textRef = useRef<HTMLSpanElement>(null);     // Text inside the cursor
 
   useEffect(() => {
     const ctx = gsap.context(() => {
       const cursor = cursorRef.current;
       const follower = followerRef.current;
       const text = textRef.current;
+
+      // Add null checks for TypeScript
+      if (!cursor || !follower || !text) return;
 
       // --- 1. MOVEMENT SETUP ---
       // We need previous coordinates to calculate velocity
@@ -55,7 +58,7 @@ const CustomCursor = () => {
       });
 
       // --- 3. MOUSE LISTENERS ---
-      const handleMouseMove = (e) => {
+      const handleMouseMove = (e: MouseEvent) => {
         mouseX = e.clientX;
         mouseY = e.clientY;
         
@@ -79,12 +82,11 @@ const CustomCursor = () => {
       window.addEventListener("mousedown", handleMouseDown);
       window.addEventListener("mouseup", handleMouseUp);
 
-
       // --- 4. SMART HOVER DETECTION (Event Delegation) ---
       // Instead of querying selectors, we check the target on mouseover.
       // This works even for content added dynamically later.
-      const handleMouseOver = (e) => {
-        const target = e.target;
+      const handleMouseOver = (e: Event) => {
+        const target = e.target as HTMLElement;
 
         // Check if hovering a Link, Button, or specific class
         const isLink = target.closest("a") || target.closest("button") || target.closest(".cursor-pointer");
@@ -143,7 +145,6 @@ const CustomCursor = () => {
          window.removeEventListener("mouseup", handleMouseUp);
          document.removeEventListener("mouseover", handleMouseOver);
       };
-
     });
 
     return () => ctx.revert();
@@ -160,7 +161,7 @@ const CustomCursor = () => {
       {/* 2. Physics Follower (The Jelly Ring) */}
       <div 
         ref={followerRef} 
-        className="fixed top-0 left-0 w-8 h-8 rounded-full pointer-events-none z-[9998] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center hidden md:flex border border-yellow-400 will-change-transform"
+        className="fixed top-0 left-0 w-8 h-8 rounded-full pointer-events-none z-[9998] -translate-x-1/2 -translate-y-1/2 items-center justify-center hidden md:flex border border-yellow-400 will-change-transform"
       >
          {/* Context Text (View / Open) */}
          <span ref={textRef} className="text-[10px] font-black text-black opacity-0 uppercase tracking-widest">

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -19,35 +19,39 @@ const HomeCollectionSection = () => {
       // 1. TEXT REVEAL (Mask Effect)
       const titleChars = titleRef.current?.querySelectorAll(".char");
       
-      gsap.fromTo(titleChars, 
-        { y: "100%", opacity: 0 },
-        {
-          y: "0%",
-          opacity: 1,
-          duration: 1,
-          stagger: 0.05,
-          ease: "power4.out",
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 80%",
+      if (titleChars) {
+        gsap.fromTo(titleChars, 
+          { y: "100%", opacity: 0 },
+          {
+            y: "0%",
+            opacity: 1,
+            duration: 1,
+            stagger: 0.05,
+            ease: "power4.out",
+            scrollTrigger: {
+              trigger: sectionRef.current,
+              start: "top 80%",
+            }
           }
-        }
-      );
+        );
+      }
 
       // 2. LINE DRAWING ANIMATION
-      gsap.fromTo(lineRef.current,
-        { scaleX: 0, transformOrigin: "left" },
-        {
-          scaleX: 1,
-          duration: 1.5,
-          ease: "expo.out",
-          delay: 0.5,
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 80%",
+      if (lineRef.current) {
+        gsap.fromTo(lineRef.current,
+          { scaleX: 0, transformOrigin: "left" },
+          {
+            scaleX: 1,
+            duration: 1.5,
+            ease: "expo.out",
+            delay: 0.5,
+            scrollTrigger: {
+              trigger: sectionRef.current,
+              start: "top 80%",
+            }
           }
-        }
-      );
+        );
+      }
 
       // 3. MAGNETIC BUTTON LOGIC
       const btn = btnRef.current;
@@ -75,16 +79,18 @@ const HomeCollectionSection = () => {
 
       // 4. BACKGROUND MOVEMENT (NEW ADDITION)
       // Moves the giant text horizontally based on scroll position
-      gsap.to(bgTextRef.current, {
-        xPercent: -20, // Moves 20% to the left
-        ease: "none",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top bottom", // Start when section enters viewport
-          end: "bottom top",   // End when section leaves viewport
-          scrub: 1,            // Smooth scrolling effect
-        },
-      });
+      if (bgTextRef.current) {
+        gsap.to(bgTextRef.current, {
+          xPercent: -20, // Moves 20% to the left
+          ease: "none",
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: "top bottom", // Start when section enters viewport
+            end: "bottom top",   // End when section leaves viewport
+            scrub: 1,            // Smooth scrolling effect
+          },
+        });
+      }
 
     }, sectionRef);
 
