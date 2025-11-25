@@ -78,7 +78,7 @@ const Footer = () => {
             {/* Left Side - Brand */}
             <div className="text-center lg:text-left">
               <h2 className="text-4xl md:text-5xl font-light tracking-[6px] text-white mb-4">
-                FASHION
+                UrbanCanvas
               </h2>
               <p className="text-gray-400 text-sm max-w-md">
                 Crafting timeless elegance through exceptional design and unparalleled quality since 2010.
@@ -111,7 +111,7 @@ const Footer = () => {
 
               {/* Copyright */}
               <p className="text-gray-500 text-sm text-center lg:text-right">
-                © {new Date().getFullYear()} FASHION. All Rights Reserved.
+                © {new Date().getFullYear()} UrbanCanvas. All Rights Reserved.
               </p>
             </div>
           </div>
