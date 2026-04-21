@@ -22,7 +22,7 @@
     </div>
     
     <!-- Mobile touch controls overlay -->
-    <div v-if="isReady && gameStatus === 'start'" class="mobile-controls-overlay">
+    <div v-if="isReady && gameStatus === GAME_STATUS.START" class="mobile-controls-overlay">
       <div class="touch-zone touch-left" @touchstart="handleTouchStart('left')" @touchend="handleTouchEnd"></div>
       <div class="touch-zone touch-right" @touchstart="handleTouchStart('right')" @touchend="handleTouchEnd"></div>
       <div class="touch-zone touch-up" @touchstart="handleTouchStart('up')" @touchend="handleTouchEnd"></div>
@@ -36,6 +36,7 @@ import { onMounted, ref, computed, onUnmounted } from 'vue';
 import ScorePanel from './components/ScorePanel.vue';
 import GameGuide from './components/GameGuide.vue';
 import Game from './Game';
+import { GAME_STATUS } from './Game/const';
 
 // Whether the model is fully loaded
 const isReady = ref(false);
@@ -46,23 +47,24 @@ const coin = ref(0);
 // Number of small mistakes in the game
 const mistake = ref(0);
 // Game status
-const gameStatus = ref('ready');
+const gameStatus = ref(GAME_STATUS.READY);
 // ScorePanel reference
 const scorePanelRef = ref();
 
 let loadingData: any = ref({});
 let gameInstance: Game | null = null;
 const exp_canvas = ref<HTMLElement>();
+
 const showGuide = computed(() => {
-  return gameStatus.value !== 'start';
+  return gameStatus.value !== GAME_STATUS.START;
 });
 
 // Handle game action button click
 const handleGameAction = () => {
-  if (gameStatus.value === 'ready') {
+  if (gameStatus.value === GAME_STATUS.READY) {
     // Simulate pressing P to start
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
-  } else if (gameStatus.value === 'end') {
+  } else if (gameStatus.value === GAME_STATUS.END) {
     // Simulate pressing R to restart
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r' }));
   }
@@ -176,22 +178,21 @@ onMounted(() => {
     }
   });
   
-  gameInstance.on('gameStatus', (data: any) => {
-    console.log(data);
+  gameInstance.on('gameStatus', (data: GAME_STATUS) => {
+    console.log('Game status:', data);
     gameStatus.value = data;
   });
   
   gameInstance.on('gameData', (data: any) => {
     score.value = data.score;
-    // Don't update coin from here - it's managed by ScorePanel internally
-    // coin.value = data.coin;
     mistake.value = data.mistake;
+    // Don't update coin here - ScorePanel manages it internally
   });
   
   // Listen for coin collection events from game
   if (gameInstance) {
     gameInstance.on('coinCollected', (amount: number) => {
-      // Update local coin display
+      // Update local coin display from ScorePanel
       if (scorePanelRef.value) {
         coin.value = scorePanelRef.value.getCoinCount();
       }

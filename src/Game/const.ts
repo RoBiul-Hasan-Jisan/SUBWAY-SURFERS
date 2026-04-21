@@ -1,14 +1,15 @@
 export const enum playerStatus {
-  INIT = 'idle', // 站立
-  JUMP = 'jump', // 起跳
-  RUN = 'run', // 跑步
-  ROLL = 'roll', // 下滚
-  DANCE = 'dance', // 跳舞
-  LOOKBACK = 'lookback', // 回头看
-  RUNLOOKBACK = 'runlookback', // 回头看
-  FALL = 'fall', // 下落
-  DIE = 'die', // 下落
+  INIT = 'idle', 
+  JUMP = 'jump',
+  RUN = 'run', 
+  ROLL = 'roll', 
+  DANCE = 'dance', 
+  LOOKBACK = 'lookback', 
+  RUNLOOKBACK = 'runlookback', 
+  FALL = 'fall', 
+  DIE = 'die', 
 }
+
 export const Obstacal: any = {
   train: {
       x: 5.646066284179687,
