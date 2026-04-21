@@ -11,7 +11,12 @@
       <div v-if="loadingData.type === 'successLoad'">Loading successful, please wait a moment</div>
     </div>
     <GameGuide :show-mask="isReady && showGuide" :game-status="gameStatus" @action="handleGameAction" />
-    <ScorePanel :score="score" :coin="coin" :mistake="mistake" />
+    <ScorePanel 
+      ref="scorePanelRef"
+      :score="score" 
+      :coin="coin" 
+      :mistake="mistake" 
+    />
     <div class="experience">
       <canvas ref="exp_canvas" class="experience__canvas"></canvas>
     </div>
@@ -36,12 +41,14 @@ import Game from './Game';
 const isReady = ref(false);
 // Game score
 const score = ref(0);
-// Game coins
+// Game coins - REAL coin count from game
 const coin = ref(0);
 // Number of small mistakes in the game
 const mistake = ref(0);
 // Game status
 const gameStatus = ref('ready');
+// ScorePanel reference
+const scorePanelRef = ref();
 
 let loadingData: any = ref({});
 let gameInstance: Game | null = null;
@@ -62,10 +69,6 @@ const handleGameAction = () => {
 };
 
 // Mobile touch controls
-let touchStartY = 0;
-let touchStartX = 0;
-const SWIPE_THRESHOLD = 50;
-
 const handleTouchStart = (direction: string) => {
   const event = new KeyboardEvent('keydown', { key: getKeyForDirection(direction) });
   window.dispatchEvent(event);
@@ -86,6 +89,10 @@ const getKeyForDirection = (direction: string): string => {
 };
 
 // Handle swipe gestures for mobile
+let touchStartY = 0;
+let touchStartX = 0;
+const SWIPE_THRESHOLD = 50;
+
 const handleTouchStartSwipe = (e: TouchEvent) => {
   touchStartY = e.touches[0].clientY;
   touchStartX = e.touches[0].clientX;
@@ -144,7 +151,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
 };
 
 onMounted(() => {
-  gameInstance = new Game(exp_canvas.value);
+  // Pass the ScorePanel ref to Game for real coin collection
+  gameInstance = new Game(exp_canvas.value, scorePanelRef.value);
   
   // Add keyboard event listener for arrow keys
   window.addEventListener('keydown', handleKeyDown);
@@ -175,9 +183,20 @@ onMounted(() => {
   
   gameInstance.on('gameData', (data: any) => {
     score.value = data.score;
-    coin.value = data.coin;
+    // Don't update coin from here - it's managed by ScorePanel internally
+    // coin.value = data.coin;
     mistake.value = data.mistake;
   });
+  
+  // Listen for coin collection events from game
+  if (gameInstance) {
+    gameInstance.on('coinCollected', (amount: number) => {
+      // Update local coin display
+      if (scorePanelRef.value) {
+        coin.value = scorePanelRef.value.getCoinCount();
+      }
+    });
+  }
 });
 
 onUnmounted(() => {
