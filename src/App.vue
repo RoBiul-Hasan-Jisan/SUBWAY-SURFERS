@@ -50,7 +50,7 @@ const scorePanelRef = ref();
 
 let loadingData: any = ref({});
 let gameInstance: Game | null = null;
-const exp_canvas = ref<HTMLElement>();
+const exp_canvas = ref<HTMLCanvasElement>(); // Explicitly typed as HTMLCanvasElement
 
 const showGuide = computed(() => {
   return gameStatus.value !== GAME_STATUS.START;
@@ -152,19 +152,29 @@ onMounted(() => {
   console.log('📦 exp_canvas.value:', exp_canvas.value);
   console.log('📦 scorePanelRef.value:', scorePanelRef.value);
   
-  // Pass ScorePanel ref to Game so it can call addCoin() / resetAll()
-  gameInstance = new Game(exp_canvas.value, scorePanelRef.value);
-
-  window.addEventListener('keydown', handleKeyDown);
-
+  // Validate canvas element exists
   const canvas = exp_canvas.value;
-  if (canvas) {
-    canvas.addEventListener('touchstart', handleTouchStartSwipe);
-    canvas.addEventListener('touchend', handleTouchEndSwipe);
-    console.log('✅ Swipe listeners added to canvas');
-  } else {
+  if (!canvas) {
     console.error('❌ Canvas element not found!');
+    return;
   }
+  
+  // Verify it's an HTMLCanvasElement
+  if (!(canvas instanceof HTMLCanvasElement)) {
+    console.error('❌ exp_canvas is not an HTMLCanvasElement!', canvas);
+    return;
+  }
+  
+  // Create game instance with canvas and scorePanel ref
+  gameInstance = Game.getInstance(canvas, scorePanelRef.value);
+
+  // Add event listeners for swipe controls
+  canvas.addEventListener('touchstart', handleTouchStartSwipe);
+  canvas.addEventListener('touchend', handleTouchEndSwipe);
+  console.log('✅ Swipe listeners added to canvas');
+
+  // Add keyboard listener
+  window.addEventListener('keydown', handleKeyDown);
 
   // Resource loading progress
   if (gameInstance) {
@@ -204,15 +214,21 @@ onMounted(() => {
 
 onUnmounted(() => {
   console.log('🛑 App unmounting, cleaning up...');
+  
+  // Remove keyboard listener
   window.removeEventListener('keydown', handleKeyDown);
 
+  // Remove swipe listeners from canvas
   const canvas = exp_canvas.value;
   if (canvas) {
     canvas.removeEventListener('touchstart', handleTouchStartSwipe);
     canvas.removeEventListener('touchend', handleTouchEndSwipe);
   }
 
-  gameInstance?.disposeGame();
+  // Dispose game instance
+  if (gameInstance) {
+    gameInstance.disposeGame();
+  }
 });
 </script>
 

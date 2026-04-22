@@ -1,11 +1,13 @@
 import * as THREE from 'three';
+import { EventEmitter } from 'events';
 import Player from './player';
 import { Track } from './track';
 import { Coin } from './objects/Coin';
 import { Obstacle } from './objects/Obstacle';
-import type ScorePanel from '../components/ScorePanel.vue';
+import { GAME_STATUS } from './const';
 
-export default class Game {
+export default class Game extends EventEmitter {
+    private static instance: Game;
     private scene!: THREE.Scene;
     private camera!: THREE.PerspectiveCamera;
     private renderer!: THREE.WebGLRenderer;
@@ -47,25 +49,70 @@ export default class Game {
     private fogDensity: number = 0.02;
     private backgroundColor: THREE.Color = new THREE.Color(0x87CEEB);
 
-    constructor(canvas: HTMLCanvasElement, scorePanelComponent: any) {
+    // Singleton pattern - private constructor
+    private constructor(canvas?: HTMLCanvasElement, scorePanelComponent?: any) {
+        super(); // Call EventEmitter constructor
         this.scorePanel = scorePanelComponent;
         console.log('🎮 Game constructor - ScorePanel reference:', this.scorePanel ? 'exists' : 'null');
         
-        this.setupScene(canvas);
-        this.initPlayer();
-        this.initTrack();
-        this.setupLights();
-        this.setupEventListeners();
-        this.initDifficulty();
+        if (canvas) {
+            this.setupScene(canvas);
+            this.initPlayer();
+            this.initTrack();
+            this.setupLights();
+            this.setupEventListeners();
+            this.initDifficulty();
+            this.setupLoadingManager();
+        }
+    }
+
+    // Static method to get the singleton instance
+    public static getInstance(canvas?: HTMLCanvasElement, scorePanelComponent?: any): Game {
+        if (!Game.instance) {
+            if (!canvas) {
+                throw new Error('Canvas element is required for first Game initialization');
+            }
+            Game.instance = new Game(canvas, scorePanelComponent);
+        }
+        return Game.instance;
+    }
+
+    // Setup loading manager to track asset loading
+    private setupLoadingManager(): void {
+        THREE.DefaultLoadingManager.onLoad = () => {
+            console.log('✅ All assets loaded successfully');
+            this.emit('progress', { type: 'successLoad' });
+        };
+
+        THREE.DefaultLoadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+            console.log(`📊 Loading: ${url} (${itemsLoaded}/${itemsTotal})`);
+            this.emit('progress', { 
+                type: 'onProgress', 
+                url: url, 
+                itemsLoaded: itemsLoaded, 
+                itemsTotal: itemsTotal 
+            });
+        };
+
+        THREE.DefaultLoadingManager.onError = (url) => {
+            console.error(`❌ Error loading: ${url}`);
+            this.emit('progress', { type: 'error', url: url });
+        };
+    }
+
+    // Method to set scorePanel after initialization if needed
+    public setScorePanel(scorePanel: any): void {
+        this.scorePanel = scorePanel;
+        console.log('🎮 ScorePanel set via method:', this.scorePanel ? 'exists' : 'null');
     }
 
     private initPlayer(): void {
         this.player = Player.getInstance();
     }
 
-   private initTrack(): void {
-    this.track = new Track(this.scene);
-}
+    private initTrack(): void {
+        this.track = new Track(this.scene);
+    }
 
     private initDifficulty(): void {
         this.currentCoinSpawnInterval = this.baseCoinSpawnInterval;
@@ -213,6 +260,13 @@ export default class Game {
         this.realCoinScore += coinValue;
         this.gameScore += coinValue;
 
+        // Emit game data for UI updates
+        this.emit('gameData', {
+            score: this.gameScore,
+            mistake: this.gameMistakes,
+            coin: this.realCoinScore
+        });
+
         // CRITICAL FIX: Ensure scorePanel exists and addCoin is called
         if (this.scorePanel && typeof this.scorePanel.addCoin === 'function') {
             this.scorePanel.addCoin();
@@ -241,6 +295,13 @@ export default class Game {
         const mistakePenalty = Math.max(10, this.gameScore * 0.05 * this.currentDifficultyLevel);
         this.gameScore = Math.max(0, this.gameScore - mistakePenalty);
         this.gameMistakes++;
+
+        // Emit game data for UI updates
+        this.emit('gameData', {
+            score: this.gameScore,
+            mistake: this.gameMistakes,
+            coin: this.realCoinScore
+        });
 
         const index = this.obstacles.indexOf(obstacle);
         if (index > -1) {
@@ -360,6 +421,13 @@ export default class Game {
         const scoreMultiplier = 1 + (this.currentDifficultyLevel - 1) * 0.1;
         this.gameScore += this.SCORE_PER_FRAME * deltaTime * scoreMultiplier;
         this.gameDistance += this.gameSpeed * deltaTime;
+        
+        // Emit game data for UI updates
+        this.emit('gameData', {
+            score: this.gameScore,
+            mistake: this.gameMistakes,
+            coin: this.realCoinScore
+        });
     }
 
     private checkCollisions(): void {
@@ -471,6 +539,9 @@ export default class Game {
         this.gameRunning = true;
         this.lastTime = performance.now();
         this.initDifficulty();
+
+        // Emit game status
+        this.emit('gameStatus', GAME_STATUS.START);
 
         console.log('🎮 Game started! All scores reset.');
     }

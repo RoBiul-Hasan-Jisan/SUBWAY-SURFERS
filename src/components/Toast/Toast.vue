@@ -5,7 +5,9 @@
 </template>
 
 <script setup lang="ts">
-import {ref, watch, defineProps, defineEmits} from 'vue';
+import { ref, watch } from 'vue';
+
+// defineProps and defineEmits are available without import
 const props = defineProps({
   show: {
       type: Boolean,
@@ -27,7 +29,7 @@ let timer: any;
 
 watch(
   () => props.show,
-  (newVal, oldVal) => {
+  (newVal) => {
       isShow.value = newVal;
       if (newVal) {
           clearInterval(timer);
@@ -51,5 +53,6 @@ watch(
   font-size: 24px;
   border-radius: 4px;
   color: white;
+  z-index: 9999;
 }
 </style>
