@@ -16,18 +16,16 @@ export default class Game {
     private scorePanel: any;
     private gameScore: number = 0;
     private gameMistakes: number = 0;
-    private realCoinScore: number = 0;      // ← real coin count, never reset by penalties
+    private realCoinScore: number = 0;
     private gameRunning: boolean = false;
     private lastTime: number = 0;
     private coinSpawnTimer: number = 0;
     private obstacleSpawnTimer: number = 0;
 
-    // Dynamic difficulty settings
     private currentDifficultyLevel: number = 1;
     private gameDistance: number = 0;
     private gameSpeed: number = 8;
 
-    // Base game settings
     private baseCoinSpawnInterval: number = 1.8;
     private baseObstacleSpawnInterval: number = 2.2;
     private currentCoinSpawnInterval: number = 1.8;
@@ -35,7 +33,6 @@ export default class Game {
     private readonly COIN_VALUE = 10;
     private readonly SCORE_PER_FRAME = 1;
 
-    // Difficulty scaling parameters
     private readonly DIFFICULTY_CONFIG = {
         SPEED_INCREASE: 0.3,
         SPAWN_REDUCTION: 0.12,
@@ -47,12 +44,13 @@ export default class Game {
         COIN_DENSITY_DECREASE: 0.03
     };
 
-    // Visual effects for difficulty
     private fogDensity: number = 0.02;
     private backgroundColor: THREE.Color = new THREE.Color(0x87CEEB);
 
     constructor(canvas: HTMLCanvasElement, scorePanelComponent: any) {
         this.scorePanel = scorePanelComponent;
+        console.log('🎮 Game constructor - ScorePanel reference:', this.scorePanel ? 'exists' : 'null');
+        
         this.setupScene(canvas);
         this.initPlayer();
         this.initTrack();
@@ -123,9 +121,7 @@ export default class Game {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    // FIX: only called once per frame from update(), not also from onCoinCollected()
     private updateDifficulty(): void {
-        // Use realCoinScore so penalties don't cause level-down/flicker
         const newLevel = Math.floor(this.realCoinScore / this.DIFFICULTY_CONFIG.SCORE_PER_LEVEL) + 1;
 
         if (newLevel > this.currentDifficultyLevel && newLevel <= 10) {
@@ -136,19 +132,16 @@ export default class Game {
     }
 
     private applyDifficultyScaling(): void {
-        // Speed increases with every level
         this.gameSpeed = Math.min(
             this.DIFFICULTY_CONFIG.MAX_SPEED,
             8 + (this.currentDifficultyLevel - 1) * this.DIFFICULTY_CONFIG.SPEED_INCREASE
         );
 
-        // Coins spawn faster (shorter interval)
         this.currentCoinSpawnInterval = Math.max(
             this.DIFFICULTY_CONFIG.MIN_COIN_INTERVAL,
             this.baseCoinSpawnInterval - (this.currentDifficultyLevel - 1) * this.DIFFICULTY_CONFIG.SPAWN_REDUCTION
         );
 
-        // Obstacles spawn faster (shorter interval)
         this.currentObstacleSpawnInterval = Math.max(
             this.DIFFICULTY_CONFIG.MIN_OBSTACLE_INTERVAL,
             this.baseObstacleSpawnInterval - (this.currentDifficultyLevel - 1) * this.DIFFICULTY_CONFIG.SPAWN_REDUCTION
@@ -214,21 +207,26 @@ export default class Game {
     public onCoinCollected(coin: Coin): void {
         if (!this.gameRunning) return;
 
-        // Coin value scales with level
+        console.log('💰 Coin collected!');
+        
         const coinValue = this.COIN_VALUE + Math.floor(this.currentDifficultyLevel / 2);
 
-        // FIX: track real coin score separately — penalties won't undo level progress
         this.realCoinScore += coinValue;
         this.gameScore += coinValue;
 
-        if (this.scorePanel) {
-            this.scorePanel.addCoins(1);
-            // Pass the live coin score so the panel always shows the real number
-            this.scorePanel.setCoinScore?.(this.realCoinScore);
-            console.log(`💰 Coin collected! +${coinValue} pts | Coins: ${this.scorePanel.getCoinCount()} | Coin score: ${this.realCoinScore}`);
+        // CRITICAL FIX: Ensure scorePanel exists and addCoin is called
+        if (this.scorePanel && typeof this.scorePanel.addCoin === 'function') {
+            this.scorePanel.addCoin();
+            const currentCoins = this.scorePanel.getCoinCount();
+            console.log(`💰 +${coinValue} pts | Total coins: ${currentCoins} | Coin score: ${this.realCoinScore}`);
+        } else {
+            console.error('❌ ScorePanel or addCoin method not available!', {
+                scorePanel: this.scorePanel,
+                hasAddCoin: this.scorePanel ? typeof this.scorePanel.addCoin : 'no scorePanel'
+            });
         }
 
-        // Remove coin from tracking array
+        // Remove coin from scene and tracking array
         const index = this.coins.indexOf(coin);
         if (index > -1) {
             this.coins.splice(index, 1);
@@ -236,13 +234,11 @@ export default class Game {
         coin.dispose();
 
         this.createCoinCollectEffect(coin.position);
-        // NOTE: difficulty is NOT updated here — it's updated once per frame in update()
     }
 
     public onObstacleHit(obstacle: Obstacle): void {
         if (!this.gameRunning) return;
 
-        // Penalty scales with level but never affects realCoinScore
         const mistakePenalty = Math.max(10, this.gameScore * 0.05 * this.currentDifficultyLevel);
         this.gameScore = Math.max(0, this.gameScore - mistakePenalty);
         this.gameMistakes++;
@@ -349,7 +345,6 @@ export default class Game {
     }
 
     private spawnObstacle(): void {
-        // FIX: obstacleCount now correctly uses currentDifficultyLevel
         const obstacleCount = Math.min(3, Math.floor(this.currentDifficultyLevel / 3) + 1);
 
         for (let i = 0; i < obstacleCount; i++) {
@@ -372,27 +367,30 @@ export default class Game {
         const playerPosition = this.player.getPlayerPosition();
         if (!playerPosition) return;
 
-        // Iterate over a copy of the array so splice inside handlers is safe
-        [...this.coins].forEach(coin => {
+        // Check coin collisions
+        for (let i = this.coins.length - 1; i >= 0; i--) {
+            const coin = this.coins[i];
             if (coin.checkCollision(playerPosition)) {
                 this.onCoinCollected(coin);
+                break; // Only collect one coin per frame to avoid multiple collections
             }
-        });
+        }
 
-        [...this.obstacles].forEach(obstacle => {
+        // Check obstacle collisions
+        for (let i = this.obstacles.length - 1; i >= 0; i--) {
+            const obstacle = this.obstacles[i];
             if (obstacle.checkCollision(playerPosition)) {
                 this.onObstacleHit(obstacle);
+                break; // Only hit one obstacle per frame
             }
-        });
+        }
     }
 
     private updateObjects(deltaTime: number): void {
-        // FIX: speed passed to each object's update() so obstacles actually move
         const speed = this.gameSpeed * deltaTime;
 
-        // Coins
         this.coins = this.coins.filter(coin => {
-            coin.update(speed);           // ← moves the coin toward the player
+            coin.update(speed);
             if (coin.position.z > 10) {
                 coin.dispose();
                 return false;
@@ -400,9 +398,8 @@ export default class Game {
             return true;
         });
 
-        // Obstacles — same pattern, obstacles now move at current game speed
         this.obstacles = this.obstacles.filter(obstacle => {
-            obstacle.update(speed);       // ← moves the obstacle toward the player
+            obstacle.update(speed);
             if (obstacle.position.z > 10) {
                 obstacle.dispose();
                 return false;
@@ -429,17 +426,16 @@ export default class Game {
         if (!this.gameRunning) return;
 
         let deltaTime = (currentTime - this.lastTime) / 1000;
-        deltaTime = Math.min(deltaTime, 0.033);   // cap at ~30 fps to avoid spiral of death
+        deltaTime = Math.min(deltaTime, 0.033);
         this.lastTime = currentTime;
 
         this.player.update(deltaTime);
-        this.updateObjects(deltaTime);        // obstacles + coins move at gameSpeed
+        this.updateObjects(deltaTime);
         this.updateSpawners(deltaTime);
         this.updateGameScore(deltaTime);
         this.checkCollisions();
-        this.updateDifficulty();              // FIX: called exactly once per frame
+        this.updateDifficulty();
 
-        // Camera follows player horizontally
         const playerPos = this.player.getPlayerPosition();
         if (playerPos) {
             this.camera.position.x = playerPos.x;
@@ -450,29 +446,51 @@ export default class Game {
     }
 
     public start(): void {
+        console.log('🎮 Game starting - Resetting all values');
+        
+        this.gameScore = 0;
+        this.gameMistakes = 0;
+        this.realCoinScore = 0;
+        this.gameDistance = 0;
+        this.coinSpawnTimer = 0;
+        this.obstacleSpawnTimer = 0;
+
+        // Clear any leftover coins/obstacles from previous run
+        this.coins.forEach(c => c.dispose());
+        this.coins = [];
+        this.obstacles.forEach(o => o.dispose());
+        this.obstacles = [];
+
+        // Reset ScorePanel coin counter
+        if (this.scorePanel && typeof this.scorePanel.resetAll === 'function') {
+            this.scorePanel.resetAll();
+            console.log('✅ ScorePanel reset called');
+        } else {
+            console.error('❌ Cannot reset ScorePanel - method not available');
+        }
+
         this.gameRunning = true;
         this.lastTime = performance.now();
         this.initDifficulty();
-        console.log('Game started! Difficulty increases as you collect coins and progress.');
+
+        console.log('🎮 Game started! All scores reset.');
     }
 
     public pause(): void {
         this.gameRunning = false;
-        console.log('Game paused');
+        console.log('⏸️ Game paused');
     }
 
     public resume(): void {
         this.gameRunning = true;
         this.lastTime = performance.now();
-        console.log('Game resumed');
+        console.log('▶️ Game resumed');
     }
 
-    // Total score (can be reduced by penalties)
     public getScore(): number {
         return Math.floor(this.gameScore);
     }
 
-    // Real coin score — never reduced by obstacle penalties
     public getCoinScore(): number {
         return this.realCoinScore;
     }
@@ -489,11 +507,12 @@ export default class Game {
         return this.gameSpeed;
     }
 
-    public dispose(): void {
+    public disposeGame(): void {
         this.gameRunning = false;
         window.removeEventListener('resize', this.onWindowResize.bind(this));
         this.coins.forEach(coin => coin.dispose());
         this.obstacles.forEach(obstacle => obstacle.dispose());
         this.renderer.dispose();
+        console.log('🗑️ Game disposed');
     }
 }

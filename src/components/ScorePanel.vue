@@ -7,7 +7,7 @@
       </div>
       <div class="score-item">
         <span class="label">Coins:</span>
-        <span class="value coin-value">
+        <span class="value coin-value" :class="{ 'coin-pop': coinPopping }">
           🪙 {{ formattedCoins }}
         </span>
       </div>
@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 
 interface Props {
   score?: number;
@@ -32,131 +32,47 @@ const props = withDefaults(defineProps<Props>(), {
   mistake: 0
 });
 
-// Internal coin state with random generation
+// Internal coin state — only updated when player physically touches a coin
 const coinCount = ref(0);
-let coinInterval: number | null = null;
-let lastCoinTime = Date.now();
+const coinPopping = ref(false);
 
-// Random coin generation settings
-const COIN_CONFIG = {
-  BASE_INTERVAL: 2000,      // Base interval 2 seconds
-  RANDOM_RANGE: 3000,       // Random extra time up to 3 seconds
-  MIN_COINS: 1,             // Minimum coins per drop
-  MAX_COINS: 5,             // Maximum coins per drop
-  COLLECT_PROBABILITY: 0.7  // 70% chance to actually collect coins
+// Trigger pop animation
+const animateCoinCollection = () => {
+  coinPopping.value = true;
+  setTimeout(() => {
+    coinPopping.value = false;
+  }, 300);
 };
 
-// Generate random coins
-const generateRandomCoins = () => {
-  // Random chance to spawn coins (70% of the time)
-  if (Math.random() < COIN_CONFIG.COLLECT_PROBABILITY) {
-    const coinsEarned = Math.floor(
-      Math.random() * (COIN_CONFIG.MAX_COINS - COIN_CONFIG.MIN_COINS + 1) + COIN_CONFIG.MIN_COINS
-    );
-    
-    coinCount.value += coinsEarned;
-    
-    // Visual feedback animation
-    animateCoinCollection(coinsEarned);
-    
-    console.log(`🎉 Earned ${coinsEarned} coins! Total: ${coinCount.value}`);
-  } else {
-    console.log('😢 No coins this time...');
-  }
+// Called by Game.ts every time player touches one coin → always adds exactly 1
+const addCoin = () => {
+  console.log('💰 ScorePanel.addCoin() called, current count:', coinCount.value);
+  coinCount.value += 1;
+  animateCoinCollection();
+  console.log('💰 New coin count:', coinCount.value);
 };
 
-// Animation for coin collection
-const animateCoinCollection = (amount: number) => {
-  const coinElement = document.querySelector('.coin-value');
-  if (coinElement) {
-    coinElement.classList.add('coin-pop');
-    setTimeout(() => {
-      coinElement.classList.remove('coin-pop');
-    }, 300);
-  }
-};
-
-// Start random coin generation
-const startCoinGeneration = () => {
-  if (coinInterval) clearInterval(coinInterval);
-  
-  const scheduleNextCoin = () => {
-    const randomDelay = COIN_CONFIG.BASE_INTERVAL + Math.random() * COIN_CONFIG.RANDOM_RANGE;
-    coinInterval = setTimeout(() => {
-      generateRandomCoins();
-      scheduleNextCoin();
-    }, randomDelay) as unknown as number;
-  };
-  
-  scheduleNextCoin();
-};
-
-// Manual coin collection (can be called from parent component)
-const collectCoins = (amount: number = 1) => {
-  coinCount.value += amount;
-  animateCoinCollection(amount);
-  console.log(`💰 Manually collected ${amount} coins!`);
-};
-
-// Bonus coins for special events
-const bonusCoins = (multiplier: number = 1) => {
-  const bonusAmount = Math.floor(Math.random() * 50) + 10 * multiplier;
-  coinCount.value += bonusAmount;
-  console.log(`🎁 BONUS! +${bonusAmount} coins!`);
-};
-
-// Reset coins (if needed)
-const resetCoins = () => {
+// Reset all internal state — called when game restarts
+const resetAll = () => {
+  console.log('🔄 ScorePanel.resetAll() called');
   coinCount.value = 0;
-  console.log('Coins reset to 0');
+  coinPopping.value = false;
 };
 
-// Expose methods to parent component
+// Expose to parent (App.vue) and Game.ts
 defineExpose({
-  collectCoins,
-  bonusCoins,
-  resetCoins,
-  getCoinCount: () => coinCount.value
+  addCoin,
+  resetAll,
+  getCoinCount: () => {
+    console.log('📊 getCoinCount() returning:', coinCount.value);
+    return coinCount.value;
+  }
 });
 
-// Computed properties for formatting
-const formattedScore = computed(() => props.score.toLocaleString());
-const formattedCoins = computed(() => Math.floor(coinCount.value).toLocaleString());
+// Computed formatting
+const formattedScore = computed(() => Math.floor(props.score).toLocaleString());
+const formattedCoins = computed(() => coinCount.value.toLocaleString());
 const formattedMistakes = computed(() => props.mistake.toLocaleString());
-
-// Watch for game score to give bonus coins
-watch(() => props.score, (newScore, oldScore) => {
-  if (newScore > oldScore && newScore % 100 === 0) {
-    // Give bonus coins every 100 points
-    const bonusAmount = Math.floor(newScore / 100) * 5;
-    coinCount.value += bonusAmount;
-    console.log(`🎯 Score milestone! +${bonusAmount} bonus coins!`);
-  }
-});
-
-// Watch for mistakes to penalize coins
-watch(() => props.mistake, (newMistake, oldMistake) => {
-  if (newMistake > oldMistake && newMistake % 3 === 0) {
-    // Penalty every 3 mistakes
-    const penalty = Math.floor(coinCount.value * 0.1);
-    coinCount.value = Math.max(0, coinCount.value - penalty);
-    console.log(`⚠️ Penalty! Lost ${penalty} coins!`);
-  }
-});
-
-// Lifecycle hooks
-onMounted(() => {
-  startCoinGeneration();
-  console.log('💰 Coin generator started!');
-});
-
-onUnmounted(() => {
-  if (coinInterval) {
-    clearTimeout(coinInterval);
-    clearInterval(coinInterval);
-  }
-  console.log('Coin generator stopped');
-});
 </script>
 
 <style scoped>
@@ -246,17 +162,17 @@ onUnmounted(() => {
     top: 10px;
     right: 10px;
   }
-  
+
   .score-panel {
     padding: 8px 15px;
     min-width: 140px;
   }
-  
+
   .score-item {
     font-size: 14px;
     margin: 5px 0;
   }
-  
+
   .value {
     font-size: 16px;
   }
