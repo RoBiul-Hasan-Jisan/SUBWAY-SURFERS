@@ -1,4 +1,4 @@
-// 移除mesh, 释放内存
+
 export function disposeNode(node: any, recursive = true) {
   if (!node) {
       return;
