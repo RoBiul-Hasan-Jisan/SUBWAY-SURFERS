@@ -32,26 +32,26 @@ export default class Game extends EventEmitter {
         }
         Game.instance = this;
         this.canvas = canvas;
-        // 尺寸相关
+        
         this.sizes = new Sizes();
-        // 监听window变化
+        
         this.sizes.on("resize", () => {
             this.resize();
         })
         this.time = new Time();
-        // 做每一帧的动作更新
+        
         this.time.on("update", () => {
             this.update();
         })
-        // scene 场景
+        
         this.scene = new GameScene().scene;
-        // 相机
+       
         this.camera = new Camera();
-        // 画布
+        
         this.renderer = new Renderer();
-        // 环境
+        
         this.environment = new Environment();
-        this.player = new Player();
+        this.player = Player.getInstance();
         this.resize();
         this.resource();
     }

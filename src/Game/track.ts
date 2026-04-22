@@ -6,8 +6,10 @@ export class Track {
     private segmentLength: number = 10;
     private segmentCount: number = 10;
     
-    constructor() {
+    constructor(scene: THREE.Scene) {
+        this.scene = scene;
         this.createTrack();
+        // Don't auto-add to scene
     }
     
     private createTrack(): void {
@@ -27,8 +29,8 @@ export class Track {
         }
     }
     
-    public addToScene(scene: THREE.Scene): void {
-        this.segments.forEach(segment => scene.add(segment));
+    public addToScene(): void {
+        this.segments.forEach(segment => this.scene.add(segment));
     }
     
     public update(speed: number): void {

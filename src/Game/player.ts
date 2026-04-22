@@ -63,7 +63,7 @@ export default class Player extends EventEmitter {
         }
     }
 
-    private async createPlayer(firstPersonView: boolean = true): Promise<void> {
+   public async createPlayer(firstPersonView: boolean = true): Promise<void> {
         const { scene: playerModel, animations = [] } = await load3DModel('/assets/glb/player1.glb');
         
         // Cast to Group since load3DModel returns a Group

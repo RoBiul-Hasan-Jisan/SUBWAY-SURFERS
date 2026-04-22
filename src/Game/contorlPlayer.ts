@@ -82,7 +82,7 @@ export class ControlPlayer extends EventEmitter {
         this.model = model;
         this.mixer = mixer;
         this.game = new Game();
-        this.player = new Player();
+        this.player = Player.getInstance();
         this.scene = this.game.scene;
         this.allAnimate = allAnimate;
         // Running speed

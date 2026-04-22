@@ -63,10 +63,9 @@ export default class Game {
         this.player = Player.getInstance();
     }
 
-    private initTrack(): void {
-        this.track = new Track();
-        this.track.addToScene(this.scene);
-    }
+   private initTrack(): void {
+    this.track = new Track(this.scene);
+}
 
     private initDifficulty(): void {
         this.currentCoinSpawnInterval = this.baseCoinSpawnInterval;
