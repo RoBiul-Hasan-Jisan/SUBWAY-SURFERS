@@ -20,58 +20,36 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 interface Props {
   score?: number;
   mistake?: number;
+  coins?: number;  // ✅ Add coins prop
 }
 
 const props = withDefaults(defineProps<Props>(), {
   score: 0,
-  mistake: 0
+  mistake: 0,
+  coins: 0
 });
 
-// Internal coin state — only updated when player physically touches a coin
-const coinCount = ref(0);
+// Only for animation - NOT for storing state
 const coinPopping = ref(false);
 
-// Trigger pop animation
-const animateCoinCollection = () => {
-  coinPopping.value = true;
-  setTimeout(() => {
-    coinPopping.value = false;
-  }, 300);
-};
-
-// Called by Game.ts every time player touches one coin → always adds exactly 1
-const addCoin = () => {
-  console.log('💰 ScorePanel.addCoin() called, current count:', coinCount.value);
-  coinCount.value += 1;
-  animateCoinCollection();
-  console.log('💰 New coin count:', coinCount.value);
-};
-
-// Reset all internal state — called when game restarts
-const resetAll = () => {
-  console.log('🔄 ScorePanel.resetAll() called');
-  coinCount.value = 0;
-  coinPopping.value = false;
-};
-
-// Expose to parent (App.vue) and Game.ts
-defineExpose({
-  addCoin,
-  resetAll,
-  getCoinCount: () => {
-    console.log('📊 getCoinCount() returning:', coinCount.value);
-    return coinCount.value;
+// Watch for coin changes to trigger animation
+watch(() => props.coins, (newVal, oldVal) => {
+  if (newVal > oldVal) {
+    coinPopping.value = true;
+    setTimeout(() => {
+      coinPopping.value = false;
+    }, 300);
   }
 });
 
-// Computed formatting
+// Computed formatting - using props directly
 const formattedScore = computed(() => Math.floor(props.score).toLocaleString());
-const formattedCoins = computed(() => coinCount.value.toLocaleString());
+const formattedCoins = computed(() => props.coins.toLocaleString());
 const formattedMistakes = computed(() => props.mistake.toLocaleString());
 </script>
 

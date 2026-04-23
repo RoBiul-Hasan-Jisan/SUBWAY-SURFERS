@@ -10,11 +10,18 @@
       <div>Loaded {{ loadingData.itemsLoaded || 0 }}/{{ loadingData.itemsTotal || 0 }}</div>
       <div v-if="loadingData.type === 'successLoad'">Loading successful, please wait a moment</div>
     </div>
-    <GameGuide :show-mask="isReady && showGuide" :game-status="gameStatus" @action="handleGameAction" />
+    <GameGuide 
+      :show-mask="isReady && showGuide" 
+      :game-status="gameStatus"
+      :score="score"
+      :coins="coins"
+      :mistakes="mistake"
+      @action="handleGameAction" 
+    />
     <ScorePanel
-      ref="scorePanelRef"
       :score="score"
       :mistake="mistake"
+      :coins="coins"
     />
     <div class="experience">
       <canvas ref="exp_canvas" class="experience__canvas"></canvas>
@@ -43,14 +50,14 @@ const isReady = ref(false);
 const score = ref(0);
 // Number of mistakes (passed as prop to ScorePanel for display)
 const mistake = ref(0);
+// Coins collected (single source of truth)
+const coins = ref(0);
 // Game status
 const gameStatus = ref(GAME_STATUS.READY);
-// ScorePanel ref — used to call resetAll() and getCoinCount()
-const scorePanelRef = ref();
 
 let loadingData: any = ref({});
 let gameInstance: Game | null = null;
-const exp_canvas = ref<HTMLCanvasElement>(); // Explicitly typed as HTMLCanvasElement
+const exp_canvas = ref<HTMLCanvasElement>();
 
 const showGuide = computed(() => {
   return gameStatus.value !== GAME_STATUS.START;
@@ -61,13 +68,7 @@ const resetScores = () => {
   console.log('🔄 resetScores called');
   score.value = 0;
   mistake.value = 0;
-  // ScorePanel manages its own internal coin count; tell it to reset
-  if (scorePanelRef.value) {
-    console.log('📢 Calling scorePanelRef.resetAll()');
-    scorePanelRef.value.resetAll();
-  } else {
-    console.warn('⚠️ scorePanelRef.value is null in resetScores');
-  }
+  coins.value = 0;
 };
 
 // Handle game action button click (Start / Restart)
@@ -150,7 +151,6 @@ const handleKeyDown = (e: KeyboardEvent) => {
 onMounted(() => {
   console.log('🚀 App mounted, initializing game...');
   console.log('📦 exp_canvas.value:', exp_canvas.value);
-  console.log('📦 scorePanelRef.value:', scorePanelRef.value);
   
   // Validate canvas element exists
   const canvas = exp_canvas.value;
@@ -165,8 +165,8 @@ onMounted(() => {
     return;
   }
   
-  // Create game instance with canvas and scorePanel ref
-  gameInstance = Game.getInstance(canvas, scorePanelRef.value);
+  // Create game instance with canvas only (no scorePanel ref needed)
+  gameInstance = Game.getInstance(canvas);
 
   // Add event listeners for swipe controls
   canvas.addEventListener('touchstart', handleTouchStartSwipe);
@@ -201,11 +201,12 @@ onMounted(() => {
       }
     });
 
-    // ── Live score/mistake updates from game loop ──────────────────────────────
+    // ── Live score/mistake/coin updates from game loop ─────────────────────────
     gameInstance.on('gameData', (data: any) => {
       score.value = data.score;
       mistake.value = data.mistake;
-      // coin is NOT synced here — ScorePanel.addCoin() handles it directly
+      coins.value = data.coin; // ✅ Single source of truth for coins
+      console.log('💰 GameData received - coins:', data.coin);
     });
   } else {
     console.error('❌ Failed to create game instance!');

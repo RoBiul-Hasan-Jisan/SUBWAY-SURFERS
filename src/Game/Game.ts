@@ -15,7 +15,6 @@ export default class Game extends EventEmitter {
     private track!: Track;
     private coins: Coin[] = [];
     private obstacles: Obstacle[] = [];
-    private scorePanel: any;
     private gameScore: number = 0;
     private gameMistakes: number = 0;
     private realCoinScore: number = 0;
@@ -49,11 +48,10 @@ export default class Game extends EventEmitter {
     private fogDensity: number = 0.02;
     private backgroundColor: THREE.Color = new THREE.Color(0x87CEEB);
 
-    // Singleton pattern - private constructor
-    private constructor(canvas?: HTMLCanvasElement, scorePanelComponent?: any) {
+    // Singleton pattern - private constructor (no UI dependencies)
+    private constructor(canvas?: HTMLCanvasElement) {
         super(); // Call EventEmitter constructor
-        this.scorePanel = scorePanelComponent;
-        console.log('🎮 Game constructor - ScorePanel reference:', this.scorePanel ? 'exists' : 'null');
+        console.log('🎮 Game constructor - No UI dependencies');
         
         if (canvas) {
             this.setupScene(canvas);
@@ -66,13 +64,13 @@ export default class Game extends EventEmitter {
         }
     }
 
-    // Static method to get the singleton instance
-    public static getInstance(canvas?: HTMLCanvasElement, scorePanelComponent?: any): Game {
+    // Static method to get the singleton instance (no UI dependencies)
+    public static getInstance(canvas?: HTMLCanvasElement): Game {
         if (!Game.instance) {
             if (!canvas) {
                 throw new Error('Canvas element is required for first Game initialization');
             }
-            Game.instance = new Game(canvas, scorePanelComponent);
+            Game.instance = new Game(canvas);
         }
         return Game.instance;
     }
@@ -98,12 +96,6 @@ export default class Game extends EventEmitter {
             console.error(`❌ Error loading: ${url}`);
             this.emit('progress', { type: 'error', url: url });
         };
-    }
-
-    // Method to set scorePanel after initialization if needed
-    public setScorePanel(scorePanel: any): void {
-        this.scorePanel = scorePanel;
-        console.log('🎮 ScorePanel set via method:', this.scorePanel ? 'exists' : 'null');
     }
 
     private initPlayer(): void {
@@ -260,24 +252,14 @@ export default class Game extends EventEmitter {
         this.realCoinScore += coinValue;
         this.gameScore += coinValue;
 
-        // Emit game data for UI updates
+        // ✅ ONLY emit game data - NO UI manipulation
         this.emit('gameData', {
             score: this.gameScore,
             mistake: this.gameMistakes,
             coin: this.realCoinScore
         });
 
-        // CRITICAL FIX: Ensure scorePanel exists and addCoin is called
-        if (this.scorePanel && typeof this.scorePanel.addCoin === 'function') {
-            this.scorePanel.addCoin();
-            const currentCoins = this.scorePanel.getCoinCount();
-            console.log(`💰 +${coinValue} pts | Total coins: ${currentCoins} | Coin score: ${this.realCoinScore}`);
-        } else {
-            console.error('❌ ScorePanel or addCoin method not available!', {
-                scorePanel: this.scorePanel,
-                hasAddCoin: this.scorePanel ? typeof this.scorePanel.addCoin : 'no scorePanel'
-            });
-        }
+        console.log(`💰 +${coinValue} pts | Total coins: ${this.realCoinScore} | Score: ${this.gameScore}`);
 
         // Remove coin from scene and tracking array
         const index = this.coins.indexOf(coin);
@@ -296,7 +278,7 @@ export default class Game extends EventEmitter {
         this.gameScore = Math.max(0, this.gameScore - mistakePenalty);
         this.gameMistakes++;
 
-        // Emit game data for UI updates
+        // ✅ ONLY emit game data - NO UI manipulation
         this.emit('gameData', {
             score: this.gameScore,
             mistake: this.gameMistakes,
@@ -422,7 +404,7 @@ export default class Game extends EventEmitter {
         this.gameScore += this.SCORE_PER_FRAME * deltaTime * scoreMultiplier;
         this.gameDistance += this.gameSpeed * deltaTime;
         
-        // Emit game data for UI updates
+        // ✅ Emit game data for UI updates
         this.emit('gameData', {
             score: this.gameScore,
             mistake: this.gameMistakes,
@@ -515,6 +497,7 @@ export default class Game extends EventEmitter {
     public start(): void {
         console.log('🎮 Game starting - Resetting all values');
         
+        // Reset all game state
         this.gameScore = 0;
         this.gameMistakes = 0;
         this.realCoinScore = 0;
@@ -528,19 +511,12 @@ export default class Game extends EventEmitter {
         this.obstacles.forEach(o => o.dispose());
         this.obstacles = [];
 
-        // Reset ScorePanel coin counter
-        if (this.scorePanel && typeof this.scorePanel.resetAll === 'function') {
-            this.scorePanel.resetAll();
-            console.log('✅ ScorePanel reset called');
-        } else {
-            console.error('❌ Cannot reset ScorePanel - method not available');
-        }
-
+        // ✅ NO UI manipulation - just emit events
         this.gameRunning = true;
         this.lastTime = performance.now();
         this.initDifficulty();
 
-        // Emit game status
+        // Emit game status for UI to handle
         this.emit('gameStatus', GAME_STATUS.START);
 
         console.log('🎮 Game started! All scores reset.');
@@ -549,12 +525,14 @@ export default class Game extends EventEmitter {
     public pause(): void {
         this.gameRunning = false;
         console.log('⏸️ Game paused');
+        this.emit('gameStatus', GAME_STATUS.PAUSE);
     }
 
     public resume(): void {
         this.gameRunning = true;
         this.lastTime = performance.now();
         console.log('▶️ Game resumed');
+        this.emit('gameStatus', GAME_STATUS.START);
     }
 
     public getScore(): number {

@@ -69,7 +69,7 @@
           </button>
         </template>
 
-        <!-- PAUSE screen (optional) -->
+        <!-- PAUSE screen -->
         <template v-else-if="gameStatus === 'pause'">
           <div class="panel-title">⏸️ Game paused</div>
           
@@ -97,7 +97,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch, onUnmounted } from 'vue';
+import { watch, onUnmounted, computed } from 'vue';
 
 const props = defineProps({
   showMask:   { type: Boolean, default: false },
@@ -106,10 +106,31 @@ const props = defineProps({
   coins:      { type: Number,  default: 0 },
   mistakes:   { type: Number,  default: 0 },
   difficulty: { type: Number,  default: 1 },
-  bestScore:  { type: Number,  default: 0 },
 });
 
 const emit = defineEmits(['action']);
+
+// Best score management with localStorage
+const STORAGE_KEY = 'game_best_score';
+const getStoredBestScore = (): number => {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  return stored ? parseInt(stored, 10) : 0;
+};
+
+const saveBestScore = (score: number): void => {
+  const currentBest = getStoredBestScore();
+  if (score > currentBest) {
+    localStorage.setItem(STORAGE_KEY, score.toString());
+  }
+};
+
+// Computed best score that updates when game ends
+const bestScore = computed(() => {
+  if (props.gameStatus === 'end') {
+    saveBestScore(props.score);
+  }
+  return Math.max(getStoredBestScore(), props.gameStatus === 'end' ? props.score : 0);
+});
 
 // Keyboard shortcuts: P = start/pause, R = restart
 const onKey = (e: KeyboardEvent) => {
