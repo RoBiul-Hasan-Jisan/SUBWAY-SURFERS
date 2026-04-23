@@ -1,15 +1,27 @@
 <template>
   <div>
+    <!-- Loading Screen with better UX -->
     <div v-if="!isReady" class="loading">
       <div class="loading-anima aaa">
         <div></div>
         <div></div>
         <div></div>
       </div>
-      <div>Loading resources: {{ loadingData.url }}</div>
-      <div>Loaded {{ loadingData.itemsLoaded || 0 }}/{{ loadingData.itemsTotal || 0 }}</div>
-      <div v-if="loadingData.type === 'successLoad'">Loading successful, please wait a moment</div>
+      <div class="loading-text">Loading resources: {{ loadingData.url }}</div>
+      <div class="loading-progress">
+        <div class="progress-bar">
+          <div class="progress-fill" :style="{ width: loadingProgress + '%' }"></div>
+        </div>
+        <div class="progress-text">Loaded {{ loadingData.itemsLoaded || 0 }}/{{ loadingData.itemsTotal || 0 }}</div>
+      </div>
+      <div v-if="loadingData.type === 'successLoad'" class="loading-success">
+        ✅ Loading successful, please wait a moment
+      </div>
+      <div v-if="loadingData.type === 'error'" class="loading-error">
+        ❌ Error loading resources, please refresh the page
+      </div>
     </div>
+
     <GameGuide 
       :show-mask="isReady && showGuide" 
       :game-status="gameStatus"
@@ -18,22 +30,37 @@
       :mistakes="mistake"
       @action="handleGameAction" 
     />
+    
     <ScorePanel
       :score="score"
       :mistake="mistake"
       :coins="coins"
       @toggle-music="toggleMusic"
     />
+    
     <div class="experience">
       <canvas ref="exp_canvas" class="experience__canvas"></canvas>
     </div>
 
-    <!-- Mobile touch controls overlay -->
+    <!-- Mobile touch controls overlay with better visual feedback -->
     <div v-if="isReady && gameStatus === GAME_STATUS.START" class="mobile-controls-overlay">
-      <div class="touch-zone touch-left" @touchstart="handleTouchStart('left')" @touchend="handleTouchEnd"></div>
-      <div class="touch-zone touch-right" @touchstart="handleTouchStart('right')" @touchend="handleTouchEnd"></div>
-      <div class="touch-zone touch-up" @touchstart="handleTouchStart('up')" @touchend="handleTouchEnd"></div>
-      <div class="touch-zone touch-down" @touchstart="handleTouchStart('down')" @touchend="handleTouchEnd"></div>
+      <div class="touch-zone touch-left" @touchstart="handleTouchStart('left')" @touchend="handleTouchEnd" @touchcancel="handleTouchEnd">
+        <span>←</span>
+      </div>
+      <div class="touch-zone touch-right" @touchstart="handleTouchStart('right')" @touchend="handleTouchEnd" @touchcancel="handleTouchEnd">
+        <span>→</span>
+      </div>
+      <div class="touch-zone touch-up" @touchstart="handleTouchStart('up')" @touchend="handleTouchEnd" @touchcancel="handleTouchEnd">
+        <span>↑</span>
+      </div>
+      <div class="touch-zone touch-down" @touchstart="handleTouchStart('down')" @touchend="handleTouchEnd" @touchcancel="handleTouchEnd">
+        <span>↓</span>
+      </div>
+    </div>
+
+    <!-- FPS Counter (optional, press F to toggle) -->
+    <div v-if="showFPS" class="fps-counter">
+      FPS: {{ fps }}
     </div>
 
     <!-- Hidden audio element for background music -->
@@ -63,8 +90,14 @@ const gameStatus = ref(GAME_STATUS.READY);
 // Music state
 const isMusicPlaying = ref(true);
 const bgMusic = ref<HTMLAudioElement | null>(null);
+// FPS counter
+const showFPS = ref(false);
+const fps = ref(60);
+let frameCount = 0;
+let lastFPSUpdate = performance.now();
 
 let loadingData: any = ref({});
+let loadingProgress = ref(0);
 let gameInstance: Game | null = null;
 const exp_canvas = ref<HTMLCanvasElement>();
 
@@ -80,19 +113,48 @@ const resetScores = () => {
   coins.value = 0;
 };
 
-// Toggle music on/off
+// Toggle music on/off with better feedback
 const toggleMusic = () => {
   if (bgMusic.value) {
     if (isMusicPlaying.value) {
       bgMusic.value.pause();
       isMusicPlaying.value = false;
       console.log('🔇 Music paused');
+      // Optional: Show toast notification
+      showToast('Music paused', 'info');
     } else {
-      bgMusic.value.play().catch(e => console.log('Play failed:', e));
+      bgMusic.value.play().catch(e => {
+        console.log('Play failed:', e);
+        showToast('Unable to play music', 'error');
+      });
       isMusicPlaying.value = true;
       console.log('🔊 Music resumed');
+      showToast('Music resumed', 'info');
     }
   }
+};
+
+// Simple toast notification (optional)
+const showToast = (message: string, type: string = 'info') => {
+  const toast = document.createElement('div');
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: ${type === 'error' ? 'rgba(255, 68, 68, 0.9)' : 'rgba(0, 0, 0, 0.8)'};
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 10000;
+    animation: fadeOutUp 2s ease-out forwards;
+    pointer-events: none;
+    white-space: nowrap;
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
 };
 
 // Start music after user interaction (browser policy)
@@ -100,6 +162,7 @@ const startMusicOnInteraction = () => {
   if (bgMusic.value && bgMusic.value.paused && isMusicPlaying.value) {
     bgMusic.value.play().catch(e => {
       console.log('Audio autoplay blocked. User interaction required.', e);
+      showToast('Click/tap to start music', 'info');
     });
   }
   // Remove listeners after first interaction
@@ -118,9 +181,15 @@ const handleGameAction = () => {
   }
 };
 
-// Mobile touch controls
+// Mobile touch controls with haptic feedback (if supported)
 const handleTouchStart = (direction: string) => {
   console.log('👆 Touch direction:', direction);
+  
+  // Optional: Haptic feedback for mobile
+  if (navigator.vibrate) {
+    navigator.vibrate(50);
+  }
+  
   const event = new KeyboardEvent('keydown', { key: getKeyForDirection(direction) });
   window.dispatchEvent(event);
 };
@@ -176,6 +245,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
     ArrowRight: 'd',
     ' ': 'w'
   };
+  
+  // Toggle FPS counter with 'F' key
+  if (e.key === 'f' || e.key === 'F') {
+    showFPS.value = !showFPS.value;
+    e.preventDefault();
+    return;
+  }
 
   const mappedKey = map[e.key];
   if (mappedKey) {
@@ -183,6 +259,20 @@ const handleKeyDown = (e: KeyboardEvent) => {
     console.log('⌨️ Key pressed:', e.key, '→ mapped to:', mappedKey);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: mappedKey }));
   }
+};
+
+// Update FPS counter
+const updateFPS = () => {
+  if (showFPS.value) {
+    frameCount++;
+    const now = performance.now();
+    if (now - lastFPSUpdate >= 1000) {
+      fps.value = frameCount;
+      frameCount = 0;
+      lastFPSUpdate = now;
+    }
+  }
+  requestAnimationFrame(updateFPS);
 };
 
 onMounted(() => {
@@ -195,16 +285,21 @@ onMounted(() => {
     console.log('🎵 Background music initialized');
   }
   
+  // Start FPS counter
+  updateFPS();
+  
   // Validate canvas element exists
   const canvas = exp_canvas.value;
   if (!canvas) {
     console.error('❌ Canvas element not found!');
+    showToast('Failed to initialize game', 'error');
     return;
   }
   
   // Verify it's an HTMLCanvasElement
   if (!(canvas instanceof HTMLCanvasElement)) {
     console.error('❌ exp_canvas is not an HTMLCanvasElement!', canvas);
+    showToast('Game initialization error', 'error');
     return;
   }
   
@@ -232,6 +327,13 @@ onMounted(() => {
         loadingData.value.type = 'successLoad';
         isReady.value = true;
         console.log('✅ Game ready!');
+        showToast('Game ready! Press P to start', 'info');
+      } else if (data.type === 'onProgress') {
+        loadingData.value = data;
+        loadingProgress.value = (data.itemsLoaded / data.itemsTotal) * 100;
+      } else if (data.type === 'error') {
+        loadingData.value = data;
+        showToast('Failed to load game resources', 'error');
       } else {
         loadingData.value = data;
       }
@@ -257,6 +359,7 @@ onMounted(() => {
       if (data === GAME_STATUS.END && bgMusic.value) {
         bgMusic.value.pause();
         console.log('⏸️ Music paused - Game Over');
+        showToast('Game Over! Press R to restart', 'info');
       }
     });
 
@@ -269,6 +372,7 @@ onMounted(() => {
     });
   } else {
     console.error('❌ Failed to create game instance!');
+    showToast('Failed to start game', 'error');
   }
 });
 
@@ -304,6 +408,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Loading screen improvements */
 .loading {
   position: fixed;
   height: 100vh;
@@ -313,7 +418,54 @@ onUnmounted(() => {
   align-items: center;
   flex-direction: column;
   z-index: 999;
-  background-color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.loading-text {
+  margin-top: 20px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.loading-progress {
+  margin-top: 20px;
+  width: 300px;
+  max-width: 80vw;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: white;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  margin-top: 8px;
+  font-size: 12px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.loading-success {
+  margin-top: 20px;
+  color: #4ade80;
+  font-size: 14px;
+}
+
+.loading-error {
+  margin-top: 20px;
+  color: #f87171;
+  font-size: 14px;
 }
 
 .loading-anima,
@@ -328,15 +480,11 @@ onUnmounted(() => {
   color: white;
 }
 
-.loading-anima.la-dark {
-  color: #333;
-}
-
 .loading-anima > div {
   display: inline-block;
   float: none;
-  background-color: black;
-  border: 0 solid black;
+  background-color: white;
+  border: 0 solid white;
 }
 
 .loading-anima {
@@ -362,6 +510,11 @@ onUnmounted(() => {
   100% { transform: translateY(0); }
 }
 
+@keyframes fadeOutUp {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+}
+
 .experience {
   position: fixed;
   height: 100vh;
@@ -381,7 +534,23 @@ canvas {
   top: 0;
 }
 
-/* Mobile touch controls */
+/* FPS Counter */
+.fps-counter {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #4ade80;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 1000;
+  pointer-events: none;
+  font-weight: bold;
+}
+
+/* Mobile touch controls with better visual feedback */
 .mobile-controls-overlay {
   position: fixed;
   bottom: 20px;
@@ -407,6 +576,14 @@ canvas {
   font-size: 30px;
   color: white;
   transition: all 0.2s ease;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.touch-zone span {
+  font-size: 40px;
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .touch-left  { bottom: 20px; left: 20px; }
@@ -425,5 +602,6 @@ canvas {
 
 @media (max-width: 768px) {
   .touch-zone { width: 60px; height: 60px; }
+  .touch-zone span { font-size: 30px; }
 }
 </style>
