@@ -15,6 +15,12 @@
         <span class="label">Mistakes:</span>
         <span class="value mistake-value">{{ formattedMistakes }}</span>
       </div>
+      <div class="score-item music-item">
+        <span class="label">🎵 Music:</span>
+        <button class="music-toggle" @click.stop="toggleMusic">
+          {{ isMusicPlaying ? '🔊' : '🔇' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -25,7 +31,7 @@ import { computed, ref, watch } from 'vue';
 interface Props {
   score?: number;
   mistake?: number;
-  coins?: number;  // ✅ Add coins prop
+  coins?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +39,11 @@ const props = withDefaults(defineProps<Props>(), {
   mistake: 0,
   coins: 0
 });
+
+const emit = defineEmits(['toggle-music']);
+
+// Music state (local UI state only)
+const isMusicPlaying = ref(true);
 
 // Only for animation - NOT for storing state
 const coinPopping = ref(false);
@@ -51,6 +62,12 @@ watch(() => props.coins, (newVal, oldVal) => {
 const formattedScore = computed(() => Math.floor(props.score).toLocaleString());
 const formattedCoins = computed(() => props.coins.toLocaleString());
 const formattedMistakes = computed(() => props.mistake.toLocaleString());
+
+// Toggle music and emit event to parent
+const toggleMusic = () => {
+  isMusicPlaying.value = !isMusicPlaying.value;
+  emit('toggle-music');
+};
 </script>
 
 <style scoped>
@@ -118,6 +135,36 @@ const formattedMistakes = computed(() => props.mistake.toLocaleString());
   color: #ff4444;
 }
 
+/* Music toggle button styles */
+.music-item {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.music-toggle {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+  width: 40px;
+  text-align: center;
+}
+
+.music-toggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.music-toggle:active {
+  transform: scale(0.95);
+}
+
 @keyframes coinPop {
   0% {
     transform: scale(1);
@@ -153,6 +200,17 @@ const formattedMistakes = computed(() => props.mistake.toLocaleString());
 
   .value {
     font-size: 16px;
+  }
+  
+  .music-toggle {
+    font-size: 16px;
+    padding: 2px 8px;
+    width: 36px;
+  }
+  
+  .music-item {
+    margin-top: 8px;
+    padding-top: 6px;
   }
 }
 

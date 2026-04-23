@@ -22,6 +22,7 @@
       :score="score"
       :mistake="mistake"
       :coins="coins"
+      @toggle-music="toggleMusic"
     />
     <div class="experience">
       <canvas ref="exp_canvas" class="experience__canvas"></canvas>
@@ -34,6 +35,11 @@
       <div class="touch-zone touch-up" @touchstart="handleTouchStart('up')" @touchend="handleTouchEnd"></div>
       <div class="touch-zone touch-down" @touchstart="handleTouchStart('down')" @touchend="handleTouchEnd"></div>
     </div>
+
+    <!-- Hidden audio element for background music -->
+    <audio ref="bgMusic" loop preload="auto" style="display: none;">
+      <source src="/assets/audio/song1.wav" type="audio/wav">
+    </audio>
   </div>
 </template>
 
@@ -54,6 +60,9 @@ const mistake = ref(0);
 const coins = ref(0);
 // Game status
 const gameStatus = ref(GAME_STATUS.READY);
+// Music state
+const isMusicPlaying = ref(true);
+const bgMusic = ref<HTMLAudioElement | null>(null);
 
 let loadingData: any = ref({});
 let gameInstance: Game | null = null;
@@ -69,6 +78,34 @@ const resetScores = () => {
   score.value = 0;
   mistake.value = 0;
   coins.value = 0;
+};
+
+// Toggle music on/off
+const toggleMusic = () => {
+  if (bgMusic.value) {
+    if (isMusicPlaying.value) {
+      bgMusic.value.pause();
+      isMusicPlaying.value = false;
+      console.log('🔇 Music paused');
+    } else {
+      bgMusic.value.play().catch(e => console.log('Play failed:', e));
+      isMusicPlaying.value = true;
+      console.log('🔊 Music resumed');
+    }
+  }
+};
+
+// Start music after user interaction (browser policy)
+const startMusicOnInteraction = () => {
+  if (bgMusic.value && bgMusic.value.paused && isMusicPlaying.value) {
+    bgMusic.value.play().catch(e => {
+      console.log('Audio autoplay blocked. User interaction required.', e);
+    });
+  }
+  // Remove listeners after first interaction
+  window.removeEventListener('click', startMusicOnInteraction);
+  window.removeEventListener('keydown', startMusicOnInteraction);
+  window.removeEventListener('touchstart', startMusicOnInteraction);
 };
 
 // Handle game action button click (Start / Restart)
@@ -152,6 +189,12 @@ onMounted(() => {
   console.log('🚀 App mounted, initializing game...');
   console.log('📦 exp_canvas.value:', exp_canvas.value);
   
+  // Initialize background music
+  if (bgMusic.value) {
+    bgMusic.value.volume = 0.3; // Set volume to 30%
+    console.log('🎵 Background music initialized');
+  }
+  
   // Validate canvas element exists
   const canvas = exp_canvas.value;
   if (!canvas) {
@@ -175,6 +218,11 @@ onMounted(() => {
 
   // Add keyboard listener
   window.addEventListener('keydown', handleKeyDown);
+  
+  // Add user interaction listeners for audio (required by browsers)
+  window.addEventListener('click', startMusicOnInteraction);
+  window.addEventListener('keydown', startMusicOnInteraction);
+  window.addEventListener('touchstart', startMusicOnInteraction);
 
   // Resource loading progress
   if (gameInstance) {
@@ -198,6 +246,17 @@ onMounted(() => {
       if (data === GAME_STATUS.START) {
         console.log('🏁 Game STARTED - resetting scores');
         resetScores();
+        
+        // Resume music if it was paused
+        if (bgMusic.value && isMusicPlaying.value && bgMusic.value.paused) {
+          bgMusic.value.play().catch(e => console.log('Play failed:', e));
+        }
+      }
+      
+      // Pause music on game over
+      if (data === GAME_STATUS.END && bgMusic.value) {
+        bgMusic.value.pause();
+        console.log('⏸️ Music paused - Game Over');
       }
     });
 
@@ -216,8 +275,19 @@ onMounted(() => {
 onUnmounted(() => {
   console.log('🛑 App unmounting, cleaning up...');
   
+  // Clean up audio
+  if (bgMusic.value) {
+    bgMusic.value.pause();
+    bgMusic.value = null;
+  }
+  
   // Remove keyboard listener
   window.removeEventListener('keydown', handleKeyDown);
+  
+  // Remove audio interaction listeners
+  window.removeEventListener('click', startMusicOnInteraction);
+  window.removeEventListener('keydown', startMusicOnInteraction);
+  window.removeEventListener('touchstart', startMusicOnInteraction);
 
   // Remove swipe listeners from canvas
   const canvas = exp_canvas.value;
